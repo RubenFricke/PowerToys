@@ -2,7 +2,6 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Abstractions;
@@ -84,6 +83,8 @@ namespace PowerLauncher
                     {
                         Log.Info($"Successfully read new settings. retryCount={retryCount}", GetType());
                     }
+
+                    UpdateAdditionalOptionsSettings(overloadSettings);
 
                     if (overloadSettings.Plugins == null || overloadSettings.Plugins.Count() != PluginManager.AllPlugins.Count)
                     {
@@ -214,6 +215,31 @@ namespace PowerLauncher
                 IconPathLight = GetIcon(x.Metadata, x.Metadata.IcoPathLight),
                 AdditionalOptions = x.Plugin is ISettingProvider ? (x.Plugin as ISettingProvider).AdditionalOptions : new List<PluginAdditionalOption>(),
             });
+        }
+
+        private void UpdateAdditionalOptionsSettings(PowerLauncherSettings settings)
+        {
+            foreach (var pluginPair in PluginManager.AllPlugins)
+            {
+                var plugin = pluginPair.Plugin;
+
+                if (plugin is ISettingProvider && (plugin as ISettingProvider).AdditionalOptions != null)
+                {
+                    var pluginSettings = settings.Plugins.Single(p => p.Id == pluginPair.Metadata.ID);
+
+                    var optionsToAdd = (plugin as ISettingProvider).AdditionalOptions.Except(pluginSettings.AdditionalOptions);
+
+                    foreach (var option in optionsToAdd)
+                    {
+                        pluginSettings.AdditionalOptions = pluginSettings.AdditionalOptions.Append(option);
+                    }
+
+                    var optionsToDelete = pluginSettings.AdditionalOptions.Except((plugin as ISettingProvider).AdditionalOptions);
+                    pluginSettings.AdditionalOptions = pluginSettings.AdditionalOptions.Except(optionsToDelete);
+                }
+
+                _settingsUtils.SaveSettings(settings.ToJsonString(), PowerLauncherSettings.ModuleName);
+            }
         }
     }
 }
